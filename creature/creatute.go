@@ -19,14 +19,14 @@ type Creature struct {
 	glyph      rune
 }
 
-func MakeCreature(n string) *Creature {
+func MakeCreature(n string, x int, y int) *Creature {
 
 	var newCreature = Creature{}
 
 	newCreature.attribs = make(map[string]*at.Attribute)
 	newCreature.z = 1
-	newCreature.x = rand.Intn(25) + 1
-	newCreature.y = rand.Intn(25) + 1
+	newCreature.x = x
+	newCreature.y = y
 	newCreature.race = n
 
 	db, err := sql.Open("mysql", "rodney:Akhen@t0n@tcp(127.0.0.1:3306)/roguelike")
@@ -113,6 +113,10 @@ func (c *Creature) GetPosition() (int, int, int) {
 	return c.x, c.y, c.z
 }
 
+func (c *Creature) GetGlyph() rune {
+	return c.glyph
+}
+
 func (c *Creature) DebugPrint() {
 	fmt.Printf("%s {\n\trace:\t%s\n", c.name, c.race)
 	for key, value := range c.attribs {
@@ -145,20 +149,24 @@ func (c *Creature) TryMove(a *ar.ArenaType, d ar.Direction) bool {
 		}
 	}
 
-	return true
+	return false
 }
 
-func (c *Creature) View(v *gocui.View) {
-	v.MoveCursor(c.x, c.y)
-	v.EditDelete(false)
-	v.EditWrite(c.glyph)
+func (c *Creature) NamePosView(v *gocui.View) {
+	fmt.Fprintf(v, "Name: %q\n", c.name)
+	fmt.Fprintf(v, "Pos:  x-%d y-%d\n", c.x, c.y)
 }
 
-func (c *Creature) StatView(v *gocui.View) {
-	fmt.Fprintf(v, "Strength: %d\n", c.attribs["strength"].Get())
-	fmt.Fprintf(v, "Intelligence: %d\n", c.attribs["intelligence"].Get())
-	fmt.Fprintf(v, "Dexterity: %d\n", c.attribs["dexterity"].Get())
-	fmt.Fprintf(v, "Magic:  %d/%d\n", c.attribs["magic"].Get(), c.attribs["magic"].GetMax())
-	fmt.Fprintf(v, "Health: %d/%d\n", c.attribs["health"].Get(), c.attribs["health"].GetMax())
-	fmt.Fprintf(v, "Hunger: %d/%d\n", c.attribs["hunger"].Get(), c.attribs["hunger"].GetMax())
+func (c *Creature) StatView() string {
+
+	var buffer string
+
+	buffer = fmt.Sprintf("Strength: %d\n", c.attribs["strength"].Get())
+	buffer += fmt.Sprintf("Intelligence: %d\n", c.attribs["intelligence"].Get())
+	buffer += fmt.Sprintf("Dexterity: %d\n", c.attribs["dexterity"].Get())
+	buffer += fmt.Sprintf("Magic:  %d/%d\n", c.attribs["magic"].Get(), c.attribs["magic"].GetMax())
+	buffer += fmt.Sprintf("Health: %d/%d\n", c.attribs["health"].Get(), c.attribs["health"].GetMax())
+	buffer += fmt.Sprintf("Hunger: %d/%d\n", c.attribs["hunger"].Get(), c.attribs["hunger"].GetMax())
+
+	return buffer
 }
