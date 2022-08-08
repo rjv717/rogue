@@ -2,6 +2,7 @@ package arena
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"math/rand"
@@ -37,25 +38,40 @@ func MakeArena(x, y, z int) *ArenaType {
 	for i := range aArena.field {
 		aArena.field[i] = make([]*Cell, standardSize)
 	}
-	aArena.rooms = make([]*RoomType, rand.Intn(standardSize/20)+(standardSize/30))
+	numRooms := rand.Intn(standardSize/10) + (standardSize / 10)
+	aArena.rooms = make([]*RoomType, numRooms)
 
-	for range aArena.rooms {
+	for i := 0; i < numRooms; i++ {
 
-	Retry_room:
+	Make_room:
 
 		aRoom := MakeRoom(aArena.xSize-1, aArena.ySize-1)
-		for i, v := range aArena.rooms {
-			if v == nil {
-				aArena.rooms[i] = aRoom
-				break
-			} else if aRoom.IsCollision(aArena.rooms[i]) {
-				goto Retry_room
+		for j := 0; j < numRooms; j++ {
+			if aArena.rooms[j] != nil {
+				if aArena.rooms[j].IsCollision(aRoom) {
+					i--
+					if i < 0 {
+						i = 0
+					}
+					goto Make_room
+				}
+			} else {
+				goto Next
 			}
 		}
+
+	Next:
+
+		aArena.rooms[i] = aRoom
 	}
 
-	for i := range aArena.rooms {
-		aArena.rooms[i].SetRoom(aArena)
+	for _, v := range aArena.rooms {
+		v.SetRoom(aArena)
+	}
+	for _, v := range aArena.rooms {
+		randomRoom := rand.Intn(numRooms)
+		room := aArena.rooms[randomRoom]
+		v.makeCorridor(room, aArena)
 	}
 
 	return aArena
@@ -102,6 +118,13 @@ func (a *ArenaType) GetRoom(index int) *RoomType {
 	}
 }
 
+func (a *ArenaType) getcell(x, y int) (*Cell, error) {
+	if x >= 0 && y >= 0 && x < len(a.field[0]) && y < len(a.field) {
+		return a.field[x][y], nil
+	}
+	return nil, errors.New("out of bounds")
+}
+
 func (a *ArenaType) SetCell(typeOfCell string, x, y int) {
 	var ct CellType
 
@@ -121,20 +144,22 @@ func (a *ArenaType) SetCell(typeOfCell string, x, y int) {
 	}
 }
 
-func (a *ArenaType) MapView(px, py, w, h int) string {
+func (a *ArenaType) MapView(x, y, w, h int) string {
 
 	var buffer string
-	x := px - (w / 2)
-	y := py - (h / 2)
+	xOffset := w / 2
+	yOffset := h / 2
 
-	for i := y + 1; i < y+h; i++ {
-		for j := x + 1; j < x+w; j++ {
-			if i < 0 || j < 0 || i >= len(a.field[0]) || j >= len(a.field) {
-				buffer = fmt.Sprintf("%s%c", buffer, ' ')
-			} else if a.field[i][j] != nil {
-				buffer = fmt.Sprintf("%s%c", buffer, a.field[i][j].Display())
+	for j := y - yOffset + 1; j <= y-yOffset+h; j++ {
+		for i := x - xOffset + 1; i <= x-xOffset+w; i++ {
+			if i >= 0 && i < len(a.field) && j >= 0 && j < len(a.field[0]) {
+				if a.field[i][j] != nil {
+					buffer = fmt.Sprintf("%s%c", buffer, a.field[i][j].Display())
+				} else {
+					buffer = fmt.Sprintf("%s%c", buffer, ' ')
+				}
 			} else {
-				buffer = fmt.Sprintf("%s%c", buffer, ' ')
+				buffer = fmt.Sprintf("%s%c", buffer, 'X')
 			}
 		}
 	}
@@ -160,6 +185,92 @@ func MakeRoom(xRange, yRange int) *RoomType {
 	return aRoom
 }
 
+func (r *RoomType) makeCorridor(r1 *RoomType, a *ArenaType) {
+	var x, y, ox2, oy1 int
+	var err error
+	var c *Cell
+
+	x1, y1 := r.GetCenter()
+	x2, y2 := r1.GetCenter()
+	ox2 = x2
+	oy1 = y1
+
+	if x2 < x1 {
+		temp := x2
+		x2 = x1
+		x1 = temp
+	}
+	if y2 < y1 {
+		temp := y2
+		y2 = y1
+		y1 = temp
+	}
+	for x = x1; x <= x2; x++ {
+		c, err = a.getcell(x, oy1)
+		if err == nil {
+			if c == nil || !c.IsPassable() {
+				a.field[x][oy1] = MakeCell(Floor, x, oy1, a.z)
+			}
+		}
+		c, err = a.getcell(x, oy1-1)
+		if err == nil {
+			if c == nil {
+				a.field[x][oy1-1] = MakeCell(Wall, x, oy1-1, a.z)
+			}
+		}
+		c, err = a.getcell(x, oy1+1)
+		if err == nil {
+			if c == nil {
+				a.field[x][oy1+1] = MakeCell(Wall, x, oy1+1, a.z)
+			}
+		}
+	}
+	c, err = a.getcell(ox2-1, oy1-1)
+	if err == nil {
+		if c == nil {
+			a.field[ox2-1][oy1-1] = MakeCell(Wall, ox2-1, oy1-1, a.z)
+		}
+	}
+	c, err = a.getcell(ox2-1, oy1+1)
+	if err == nil {
+		if c == nil {
+			a.field[ox2-1][oy1+1] = MakeCell(Wall, ox2-1, oy1+1, a.z)
+		}
+	}
+	c, err = a.getcell(ox2+1, oy1-1)
+	if err == nil {
+		if c == nil {
+			a.field[ox2+1][oy1-1] = MakeCell(Wall, ox2+1, oy1-1, a.z)
+		}
+	}
+	c, err = a.getcell(ox2+1, oy1+1)
+	if err == nil {
+		if c == nil {
+			a.field[ox2+1][oy1+1] = MakeCell(Wall, ox2+1, oy1+1, a.z)
+		}
+	}
+	for y = y1; y <= y2; y++ {
+		c, err = a.getcell(ox2, y)
+		if err == nil {
+			if c == nil || !c.IsPassable() {
+				a.field[ox2][y] = MakeCell(Floor, ox2, y, a.z)
+			}
+		}
+		c, err = a.getcell(ox2-1, y)
+		if err == nil {
+			if c == nil {
+				a.field[ox2-1][y] = MakeCell(Wall, ox2-1, y, a.z)
+			}
+		}
+		c, err = a.getcell(ox2+1, y)
+		if err == nil {
+			if c == nil {
+				a.field[ox2+1][y] = MakeCell(Wall, ox2+1, y, a.z)
+			}
+		}
+	}
+}
+
 func (r *RoomType) IsCollision(other *RoomType) bool {
 
 	if r.x1-1 <= other.x2+1 && r.x2+1 >= other.x1-1 && r.y1-1 <= other.y2+1 && r.y2+1 >= other.y1-1 {
@@ -170,13 +281,13 @@ func (r *RoomType) IsCollision(other *RoomType) bool {
 }
 
 func (r *RoomType) GetCenter() (int, int) {
-	return (r.x2 + r.x1) / 2, (r.y2 - r.y1) / 2
+	return (r.x2 + r.x1) / 2, (r.y2 + r.y1) / 2
 }
 
 func (r *RoomType) GetRandomPoint() (int, int) {
 
-	x := r.x1 + rand.Intn(r.x2-r.x1) + 1
-	y := r.y1 + rand.Intn(r.y2-r.y1) + 1
+	x := r.x1 + rand.Intn(r.x2-r.x1-1) + 1
+	y := r.y1 + rand.Intn(r.y2-r.y1-1) + 1
 
 	return x, y
 }
@@ -250,9 +361,9 @@ func MakeCell(cellType CellType, x, y, z int) *Cell {
 		log.Fatal(err2)
 	}
 
-	aCell := Cell{cellType, x, y, z, rune(glyph[0]), passable, true}
+	aCell := &Cell{cellType, x, y, z, rune(glyph[0]), passable, true}
 
-	return &aCell
+	return aCell
 }
 
 func (c *Cell) Fix() {

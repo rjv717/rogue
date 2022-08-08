@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"errors"
 	"log"
 	"math/rand"
 	"os"
@@ -11,7 +11,6 @@ import (
 
 	tcell "github.com/gdamore/tcell/v2"
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/jroimartin/gocui"
 )
 
 type NamesTable struct {
@@ -78,7 +77,17 @@ func main() {
 		case *tcell.EventKey:
 			if ev.Key() == tcell.KeyEscape || ev.Key() == tcell.KeyCtrlC {
 				quit()
+			} else if ev.Key() == tcell.KeyUp {
+				upArrow()
+			} else if ev.Key() == tcell.KeyDown {
+				downArrow()
+			} else if ev.Key() == tcell.KeyLeft {
+				leftArrow()
+			} else if ev.Key() == tcell.KeyRight {
+				rightArrow()
 			}
+			drawScreen(s)
+			s.Sync()
 		}
 	}
 }
@@ -86,7 +95,7 @@ func main() {
 func drawText(s tcell.Screen, x1, y1, x2, y2 int, style tcell.Style, text string) {
 	row := y1
 	col := x1
-	for _, r := range []rune(text) {
+	for _, r := range text {
 		s.SetContent(col, row, r, nil, style)
 		col++
 		if col >= x2 || r == '\n' {
@@ -101,7 +110,7 @@ func drawText(s tcell.Screen, x1, y1, x2, y2 int, style tcell.Style, text string
 
 func drawScreen(s tcell.Screen) {
 
-	// Inventory View : (w-21), 9 - (w-21), (h-9)
+	// Inventory View : (w-21), 9 - (w), (h-9)
 	// Message View : 1, (h-7) - (w-2), (h-2)
 
 	w, h := s.Size()
@@ -151,49 +160,49 @@ func drawScreen(s tcell.Screen) {
 	drawText(s, w-21, 1, w-1, 7, boxStyle, buffer)
 
 	// Map View: 1, 1 - (w-23), (h-8)  ???
+
 	px, py, _ := player.GetPosition()
-	//xoffset := -px + ((w - 24) / 2)
+	buffer2 := player.NamePosView()
+	xOffset := ((w - 23) / 2) - px
+	yOffset := ((h - 8) / 2) - py
 	buffer = level.MapView(px, py, (w - 23), (h - 8))
-	drawText(s, 1, 1, (w - 23), (h - 8), boxStyle, buffer)
-	s.SetContent((w-23)/2+1, (h-8)/2+1, player.GetGlyph(), nil, boxStyle)
-	/* for i := range npcs {
+	drawText(s, 1, 1, (w - 22), (h - 8), boxStyle, buffer)
+	s.SetContent(px+xOffset, py+yOffset, player.GetGlyph(), nil, boxStyle)
+	for i := range npcs {
 		cx, cy, _ := npcs[i].GetPosition()
-
-	} */
+		buffer2 = buffer2 + npcs[i].NamePosView()
+		if cx+xOffset > 0 && cx+xOffset <= (w-23) && cy+yOffset > 0 && cy+yOffset <= (h-8) {
+			glyph := npcs[i].GetGlyph()
+			s.SetContent(cx+xOffset, cy+yOffset, glyph, nil, boxStyle)
+		}
+	}
+	drawText(s, (w - 21), 9, w, (h - 9), boxStyle, buffer2)
 }
 
-func upArrow(g *gocui.Gui, v *gocui.View) error {
-	view, _ := g.SetCurrentView("messageView")
+func upArrow() error {
 	if player.TryMove(level, arena.Up) {
-		fmt.Fprintln(view, "Player moves Up")
+		return errors.New("creature cannot move up")
 	}
 	return nil
 }
 
-func downArrow(g *gocui.Gui, v *gocui.View) error {
-	view, _ := g.SetCurrentView("messageView")
+func downArrow() error {
 	if player.TryMove(level, arena.Down) {
-		fmt.Fprintln(view, "Player moves Down.")
+		return errors.New("creature cannot move down")
 	}
 	return nil
 }
 
-func leftArrow(g *gocui.Gui, v *gocui.View) error {
-	view, _ := g.SetCurrentView("messageView")
+func leftArrow() error {
 	if player.TryMove(level, arena.Left) {
-		fmt.Fprintln(view, "Player moves Left.")
+		return errors.New("creature cannot move left")
 	}
 	return nil
 }
 
-func rightArrow(g *gocui.Gui, v *gocui.View) error {
-	view, _ := g.SetCurrentView("messageView")
+func rightArrow() error {
 	if player.TryMove(level, arena.Right) {
-		fmt.Fprintln(view, "Player moves Right.")
+		return errors.New("creature cannot move right")
 	}
 	return nil
-}
-
-func quit(g *gocui.Gui, v *gocui.View) error {
-	return gocui.ErrQuit
 }

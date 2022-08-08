@@ -8,7 +8,6 @@ import (
 	ar "rogue/arena"
 	at "rogue/creature/attribute"
 
-	gocui "github.com/awesome-gocui/gocui"
 	_ "github.com/go-sql-driver/mysql"
 )
 
@@ -128,13 +127,13 @@ func (c *Creature) DebugPrint() {
 func (c *Creature) TryMove(a *ar.ArenaType, d ar.Direction) bool {
 	switch d {
 	case ar.Up:
-		if a.IsLocationPassable(c.x, c.y+1) {
-			c.y++
+		if a.IsLocationPassable(c.x, c.y-1) {
+			c.y--
 			return true
 		}
 	case ar.Down:
-		if a.IsLocationPassable(c.x, c.y-1) {
-			c.y--
+		if a.IsLocationPassable(c.x, c.y+1) {
+			c.y++
 			return true
 		}
 	case ar.Left:
@@ -152,9 +151,11 @@ func (c *Creature) TryMove(a *ar.ArenaType, d ar.Direction) bool {
 	return false
 }
 
-func (c *Creature) NamePosView(v *gocui.View) {
-	fmt.Fprintf(v, "Name: %q\n", c.name)
-	fmt.Fprintf(v, "Pos:  x-%d y-%d\n", c.x, c.y)
+func (c *Creature) NamePosView() string {
+
+	buffer := fmt.Sprintf("Name: %q\nPos:  x-%d y-%d\n", c.name, c.x, c.y)
+
+	return buffer
 }
 
 func (c *Creature) StatView() string {
